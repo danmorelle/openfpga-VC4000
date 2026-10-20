@@ -52,6 +52,13 @@ jobs:
         run: |
           cat src/fpga/output_files/ap_core.fit.summary || true
           grep -A 30 "Slow 1100mV 85C Model Setup Summary" src/fpga/output_files/ap_core.sta.rpt || true
+          # Also report them as annotations, readable through the API
+          fit=$(grep -E "Logic utilization|Total registers|Total block memory bits|Total RAM Blocks|Total DSP" \
+                src/fpga/output_files/ap_core.fit.summary | sed 's/^ *//; s/ *: */: /' | paste -sd ';' -)
+          echo "::notice title=Fit::${fit}"
+          worst=$(awk '/^Slack/ {print $3}' src/fpga/output_files/ap_core.sta.summary | sort -g | head -1)
+          echo "::notice title=Worst slack (all clocks, all corners)::${worst} ns"
+          case "$worst" in -*) echo "::warning title=Timing::negative slack ${worst} ns";; esac
 
       - name: Keep the Quartus reports
         if: always()
