@@ -6,8 +6,8 @@ video chip. It also plays games for the compatible consoles that used the same
 chips, such as the Acetronic MPU-1000 and Occitane OC2000. It is a port of
 the [MiSTer VC4000 core](https://github.com/MiSTer-devel/VC4000_MiSTer).
 
-**Status: early test build (0.1.0).** It works in simulation; it has not been
-tested on real hardware yet.
+**Status: early test build (0.1.0).** Tested in simulation and on a Pocket
+with Super Invaders (picture, controls and sound).
 
 ## Installing
 
@@ -61,7 +61,11 @@ processor, so:
   left over from a previous game) and starts the CPU. The Reset setting does
   the same again.
 * `input_map.v`, `video_apf.v` and `audio_apf.v` adapt the controllers, video
-  and sound to the Pocket.
+  and sound to the Pocket. The top three lines of the picture are hidden:
+  nothing can legitimately start there, but the core draws one stale sprite
+  line on the first line when a game moves a sprite away from an off-screen
+  position (a flickering line at the top). On a TV those lines are in the
+  overscan.
 * The console itself (`src/fpga/core/vc4000/`) is an unchanged copy of the
   MiSTer core (commit `2d12fc0`).
 
@@ -88,7 +92,8 @@ cd sim
 
 They check the picture size and the Pocket's video rules, every button and the
 Select shift, controller swapping, reloading a smaller cartridge, the Reset and
-Bright Colours settings and the sound output.
+Bright Colours settings, the sound output, and that no stale sprite line shows
+at the top of the picture.
 
 ## Credits and licence
 

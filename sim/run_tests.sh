@@ -9,6 +9,7 @@ cd "$(dirname "$0")"
 mkdir -p roms out
 python3 make_test_cart.py roms/test.bin > /dev/null
 python3 make_test_cart.py roms/test2k.bin --2k > /dev/null
+python3 make_test_cart.py roms/sprite.bin --sprite > /dev/null
 [ -x obj_dir/Vtb_top ] || ./build.sh > /dev/null
 
 fail=0
@@ -27,7 +28,7 @@ RED=7f0000 GREEN=007f00 BLUE=00007f MAGENTA=7f007f CYAN=007f7f YELLOW=7f7f00
 ./obj_dir/Vtb_top +frames=32 +out=out/keys \
   +press0=2,2,10 +press1=6,2,8000 +press2=10,1,4000 +press3=18,3,4080 \
   +press4=24,2,100 +press5=28,2,4010 > out/keys.log 2>&1
-expect_line out/keys.log "frame 0: hs=312 de_lines=269 width min=172 max=172" "picture is 172 x 269, 312 lines"
+expect_line out/keys.log "frame 0: hs=312 de_lines=266 width min=172 max=172" "picture is 172 x 266, 312 lines"
 expect_line out/keys.log "APF video protocol errors: 0" "APF video protocol"
 expect out/keys.log 1  $RED     "nothing pressed"
 expect out/keys.log 3  $GREEN   "A = fire (key 2)"
@@ -70,6 +71,29 @@ if (255, 255, 255) in lit:
     print('PASS Bright setting (score drawn at full brightness)')
 else:
     print('FAIL Bright setting'); ok = False
+sys.exit(0 if ok else 1)
+EOF
+
+# A sprite moved away from an off-screen position must not leave a line
+# at the top of the next frame
+./obj_dir/Vtb_top +cart=roms/sprite.bin +frames=6 +out=out/sprite > out/sprite.log 2>&1
+python3 - <<'EOF' || fail=1
+from PIL import Image
+import sys
+ok = True
+seen = 0
+for f in range(1, 6):
+    im = Image.open(f'out/sprite_{f:03d}.ppm').convert('RGB')
+    w, h = im.size
+    white = lambda y: any(im.getpixel((x, y))[0] > 100 for x in range(w))
+    if white(129):                      # sprite at VC 0x80 this frame (lines 128-137)
+        seen += 1
+        if any(white(y) for y in range(0, 4)):
+            print(f'FAIL stale sprite line at the top (frame {f})'); ok = False
+if seen == 0:
+    print('FAIL sprite test did not run'); ok = False
+elif ok:
+    print(f'PASS no stale sprite line at the top ({seen} frames checked)')
 sys.exit(0 if ok else 1)
 EOF
 

@@ -675,7 +675,25 @@ vc4000_core vc4000 (
 
 // ---------------------------------------------------------------------------
 // Video: one pixel every 8 clocks (vc_ce), positive syncs
+//
+// The first three lines of each frame are hidden. Nothing can legitimately
+// start there (objects at VC 0 start on line 3, the background and score
+// on line 22), but the core draws one stale object line on line 0 after a
+// game moves an object away from an off-screen position, which shows as a
+// flickering line at the top. On a TV these lines are in the overscan.
 // ---------------------------------------------------------------------------
+    reg  [1:0]  top_lines = 0;          // visible lines so far this frame (max 3)
+    reg         vc_de_prev = 0, vc_vs_prev = 0;
+
+always @(posedge clk_sys) begin
+    vc_de_prev <= vc_de;
+    vc_vs_prev <= vc_vs;
+    if (vc_vs & ~vc_vs_prev) top_lines <= 0;
+    else if (vc_de_prev & ~vc_de & (top_lines != 2'd3)) top_lines <= top_lines + 1'd1;
+end
+
+    wire        vc_de_shown = vc_de & (top_lines == 2'd3);
+
 assign video_rgb_clock    = clk_sys;
 assign video_rgb_clock_90 = clk_sys_90;
 
@@ -688,7 +706,7 @@ video_apf #(
     .pixce      ( vc_ce ),
     .hsync_in   ( vc_hs ),
     .vsync_in   ( vc_vs ),
-    .hblank     ( ~vc_de ),
+    .hblank     ( ~vc_de_shown ),
     .vblank     ( 1'b0 ),
     .r          ( vc_r ),
     .g          ( vc_g ),

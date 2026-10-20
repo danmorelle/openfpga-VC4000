@@ -19,7 +19,13 @@ has 0x56 there, the 2 KB one (--2k) ends before it, so after loading the
 clears everything past the end of the file).
 No commercial ROM is needed.
 
-usage: make_test_cart.py <out.bin> [--2k]
+--sprite builds a different cartridge instead: one solid sprite that jumps
+between VC 0x80 and the off-screen position 0xFD on alternate frames. The
+video chip then draws one stale sprite line at the very top of the next
+frame (the flickering line seen on hardware), which the Pocket wrapper
+must hide.
+
+usage: make_test_cart.py <out.bin> [--2k | --sprite]
 """
 import sys
 
@@ -87,7 +93,52 @@ class Asm:
         return bytes(out)
 
 
+def sprite_cart():
+    a = Asm()
+    a.org(0x0000)
+    a.bcta('start')
+    a.org(0x0003)
+    a.rete()
+    a.org(0x0010)
+    a.label('start')
+    a.ppsu(0x20)                       # inhibit interrupts
+    for i in range(10):
+        a.lodi(0xFF); a.stra(0x1F00 + i)   # object 1 shape: solid
+    a.lodi(0x40); a.stra(0x1F0A); a.stra(0x1F0B)   # HC, HCB
+    a.lodi(0x80); a.stra(0x1F0D)       # VCB
+    a.lodi(0x00); a.stra(0x1FC0)       # object sizes
+    a.lodi(0x00); a.stra(0x1FC1)       # object 1 white
+    a.lodi(0x01); a.stra(PVI_COLOUR)   # screen blue
+    a.emit(0x05, 0x00)                 # LODI,R1 0
+    a.label('loop')
+    a.label('w1')
+    a.emit(0xB4, 0x80)                 # TPSU sense: wait for vertical reset
+    a.bctr(2, 'w1')
+    a.emit(0x25, 0x01)                 # EORI,R1 1
+    a.bctr(0, 'park')
+    a.lodi(0x80)
+    a.bcta('store')
+    a.label('park')
+    a.lodi(0xFD)
+    a.label('store')
+    a.stra(0x1F0C)                     # VC
+    a.label('w0')
+    a.emit(0xB4, 0x80)                 # wait for vertical reset to end
+    a.bctr(0, 'w0')
+    a.bcta('loop')
+    return a
+
+
 def main():
+    if '--sprite' in sys.argv:
+        a = sprite_cart()
+        data = a.build(2048)
+        args = [x for x in sys.argv[1:] if not x.startswith('--')]
+        out = args[0] if args else 'roms/sprite.bin'
+        open(out, 'wb').write(data)
+        print(f'{out}: {len(data)} bytes, program ends at {a.pc:#06x}')
+        return
+
     a = Asm()
     a.org(0x0000)
     a.bcta('start')
