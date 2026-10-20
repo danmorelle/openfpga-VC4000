@@ -1,0 +1,84 @@
+# Builds the VC 4000 core with Quartus (in Docker).
+#
+# Every push to main uploads an SD card ready zip as a workflow artifact.
+# Publishing a GitHub release (tag v<version>) builds the core and attaches
+# the zip to that release; core updaters such as pupdate pick up new
+# releases from there through the openFPGA cores inventory.
+#
+# To release: bump "version" in dist/Cores/danmorelle.VC4000/core.json,
+# commit, then publish a release tagged v<version> on GitHub.
+name: Build
+
+on:
+  push:
+    branches: [main]
+  release:
+    types: [published]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out
+        uses: actions/checkout@v4
+
+      - name: Check the release tag matches core.json
+        if: github.event_name == 'release'
+        env:
+          TAG: ${{ github.event.release.tag_name }}
+        run: |
+          version=$(python3 -c "import json;print(json.load(open('dist/Cores/danmorelle.VC4000/core.json'))['core']['metadata']['version'])")
+          if [ "v$version" != "$TAG" ]; then
+            echo "Release tag $TAG does not match core.json version $version"
+            exit 1
+          fi
+
+      - name: Free disk space for the Quartus image
+        run: |
+          sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc /opt/hostedtoolcache/CodeQL
+          df -h /
+
+      - name: Compile with Quartus
+        run: |
+          docker run --rm -v "${{ github.workspace }}:/build" -w /build/src/fpga \
+            raetro/quartus:21.1 quartus_sh --flow compile ap_core
+
+      - name: Resource and timing summary
+        if: always()
+        run: |
+          cat src/fpga/output_files/ap_core.fit.summary || true
+          grep -A 30 "Slow 1100mV 85C Model Setup Summary" src/fpga/output_files/ap_core.sta.rpt || true
+
+      - name: Keep the Quartus reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: quartus-reports-${{ github.run_number }}
+          path: src/fpga/output_files/*.rpt
+
+      - name: Package for the SD card
+        run: python3 tools/package.py
+
+      - name: Upload SD card files
+        uses: actions/upload-artifact@v4
+        with:
+          name: VC4000-Pocket-build-${{ github.run_number }}
+          path: release/sd/
+          include-hidden-files: true
+
+      - name: Attach the zip to the release
+        if: github.event_name == 'release'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ github.event.release.tag_name }}
+        run: |
+          version="${TAG#v}"
+          zip="danmorelle.VC4000_${version}.zip"
+          # Zip the SD card layout so Cores/, Platforms/ and Assets/ sit at the top
+          (cd release/sd && zip -r -X "../../${zip}" .)
+          unzip -l "${zip}"
+          gh release upload "$TAG" "${zip}" --clobber

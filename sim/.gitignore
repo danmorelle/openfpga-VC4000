@@ -1,0 +1,8 @@
+roms/
+out/
+work/
+obj_dir/
+*_synth.v
+synth.log
+trace_mem.log
+trace.log

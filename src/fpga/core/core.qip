@@ -1,0 +1,14 @@
+# VC 4000 core sources (paths relative to this file)
+# Pocket glue
+set_global_assignment -name VERILOG_FILE [file join $::quartus(qip_path) "pocket/pll_vc4000.v"]
+set_global_assignment -name VERILOG_FILE [file join $::quartus(qip_path) "pocket/cart_loader.v"]
+set_global_assignment -name VERILOG_FILE [file join $::quartus(qip_path) "pocket/boot_seq.v"]
+set_global_assignment -name VERILOG_FILE [file join $::quartus(qip_path) "pocket/input_map.v"]
+set_global_assignment -name VERILOG_FILE [file join $::quartus(qip_path) "pocket/video_apf.v"]
+set_global_assignment -name VERILOG_FILE [file join $::quartus(qip_path) "pocket/audio_apf.v"]
+# MiSTer VC4000 core (Signetics 2650 CPU, 2636 PVI), unchanged
+set_global_assignment -name VHDL_FILE [file join $::quartus(qip_path) "vc4000/base_pack.vhd"]
+set_global_assignment -name VHDL_FILE [file join $::quartus(qip_path) "vc4000/sgs2650_pack.vhd"]
+set_global_assignment -name VHDL_FILE [file join $::quartus(qip_path) "vc4000/sgs2650.vhd"]
+set_global_assignment -name VHDL_FILE [file join $::quartus(qip_path) "vc4000/sgs2636.vhd"]
+set_global_assignment -name VHDL_FILE [file join $::quartus(qip_path) "vc4000/vc4000_core.vhd"]
